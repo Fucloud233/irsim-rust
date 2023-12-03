@@ -1,4 +1,4 @@
-use crate::ast;
+use crate::ast::{Operator, Variable, Sentence};
 use std::str::FromStr;
 
 grammar;
@@ -19,33 +19,58 @@ WRITE = "WRITE";
 COLON = ":";
 ASSIGN = ":=";
 
-ArthOpt: ast::Operator = {
-    "+" => ast::Operator::Plus,
-    "-" => ast::Operator::Sub,
-    "*" => ast::Operator::Mul,
-    "/" => ast::Operator::Div,
+Number: usize = {
+    r"\d+" => usize::from_str(&<>).unwrap()
 }
 
-RelOpt: ast::Operator = {
-    "==" => ast::Operator::Equal,
-    ">" => ast::Operator::Greater,
-    "<" => ast::Operator::Less,
-    ">=" => ast::Operator::GreaterEqual,
-    "<=" => ast::Operator::LessEqual,
+ArthOpt: Operator = {
+    "+" => Operator::Plus,
+    "-" => Operator::Sub,
+    "*" => Operator::Mul,
+    "/" => Operator::Div,
+}
+
+RelOpt: Operator = {
+    "==" => Operator::Equal,
+    ">" => Operator::Greater,
+    "<" => Operator::Less,
+    ">=" => Operator::GreaterEqual,
+    "<=" => Operator::LessEqual,
 }
 
 pub (crate) Label: String = {
     r"[a-z]+" => <>.to_string()
 }
 
-pub (crate) Variable: ast::Variable = {
-    r"#\d+" => ast::Variable::Number(i64::from_str(&<>[1..]).unwrap()),
-    r"&\w+" => ast::Variable::Pointer(<>[1..].to_string()),
-    r"\*\w+" => ast::Variable::Deref(<>[1..].to_string()),
+pub (crate) Var: Variable = {
+    r"#\d+" => Variable::Number(i64::from_str(&<>[1..]).unwrap()),
+    r"&\w+" => Variable::Pointer(<>[1..].to_string()),
+    r"\*\w+" => Variable::Deref(<>[1..].to_string()),
+    Label => Variable::Id(<>),
 }
 
-pub Sentence: ast::Sentence = {
+pub Sentence: Sentence = {
+    // label
+    LABEL <Label> COLON         => Sentence::Label(<>),
+    FUNC <Label> COLON          => Sentence::Func(<>),
+    // assign
+    <l: Var> ASSIGN <r: Var>    => Sentence::Assign{<>},
+    <target: Var> ASSIGN <l: Var> <opt: ArthOpt> <r: Var> 
+                                => Sentence::Arth{<>},
+    <var: Var> ASSIGN CALL <func: Label>                
+                                => Sentence::Call{<>},
+    // condition
+    GOTO <Label>                => Sentence::Goto(<>),
+    IF <l: Var> <opt: RelOpt> <r: Var> GOTO <target: Label> 
+                                => Sentence::IfGoto{<>},
+    // function
+    RETURN <Var>                => Sentence::Return(<>),
+    ARG <Var>                   => Sentence::Arg(<>),
+    PARAM <Var>                 => Sentence::Param(<>),
+    // array
+    DEC <var: Var> <size: Number> 
+                                => Sentence::Dec{<>},
+    // io
+    READ <Var>                  => Sentence::Read(<>),
+    WRITE <Var>                 => Sentence::Write(<>),
 }
-
-
-

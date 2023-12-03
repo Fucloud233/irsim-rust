@@ -14,13 +14,17 @@ pub enum Variable {
 
 pub enum Sentence {
     Label(String),
-    FUNCTION(String),
+    Func(String),
 
-    Assign(Variable, Variable),
+    Assign{
+        l: Variable, 
+        r: Variable
+    },
     Arth{
         l: Variable,
         r: Variable,
-        opt: Operator
+        opt: Operator,
+        target: Variable
     },
     Goto(String),
     IfGoto{
@@ -30,10 +34,13 @@ pub enum Sentence {
         target: String
     },
     Return(Variable),
-    Dec(Variable, usize),
+    Dec{
+        var: Variable,
+        size: usize,
+    },
     Arg(Variable),
     Call{
-        l: Variable,
+        var: Variable,
         func: String
     },
     Param(Variable),

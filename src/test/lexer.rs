@@ -22,7 +22,7 @@ fn test_label_error() {
 
 #[test]
 fn test_number() {
-    let parser = parser::VariableParser::new();
+    let parser = parser::VarParser::new();
     
     vec![
         ("#1", Variable::Number(1)),
