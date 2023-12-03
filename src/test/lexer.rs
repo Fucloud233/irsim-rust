@@ -35,7 +35,12 @@ fn test_number() {
         ("*zdcs",new_deref("zdcs")),
         ("*sa", new_deref("sa")),
     ].iter().enumerate().for_each(|(_i, case)|{
-        assert_eq!(parser.parse(case.0).unwrap(), case.1)
+        let parser_result = match parser.parse(case.0) {
+            Ok(r) => r,
+            Err(e) => panic!("case: {}\n{}", case.0, e)
+        };
+
+        assert_eq!(parser_result, case.1)
     });
 }
 
