@@ -1,4 +1,5 @@
 
+#[derive(Debug, PartialEq)]
 pub enum Operator {
     Plus, Sub, Mul, Div, 
     Equal, Greater, Less, GreaterEqual, LessEqual
@@ -12,6 +13,7 @@ pub enum Variable {
     Id(String)
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Sentence {
     Label(String),
     Func(String),
