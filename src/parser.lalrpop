@@ -1,0 +1,51 @@
+use crate::ast;
+use std::str::FromStr;
+
+grammar;
+
+LABEL = "LABEL";
+FUNC = "FUNCTION";
+
+GOTO = "GOTO";
+IF = "IF";
+RETURN = "RETURN";
+DEC = "DEC";
+ARG = "ARG";
+CALL = "CALL";
+PARAM = "PARAM";
+READ = "READ";
+WRITE = "WRITE";
+
+COLON = ":";
+ASSIGN = ":=";
+
+ArthOpt: ast::Operator = {
+    "+" => ast::Operator::Plus,
+    "-" => ast::Operator::Sub,
+    "*" => ast::Operator::Mul,
+    "/" => ast::Operator::Div,
+}
+
+RelOpt: ast::Operator = {
+    "==" => ast::Operator::Equal,
+    ">" => ast::Operator::Greater,
+    "<" => ast::Operator::Less,
+    ">=" => ast::Operator::GreaterEqual,
+    "<=" => ast::Operator::LessEqual,
+}
+
+pub (crate) Label: String = {
+    r"[a-z]+" => <>.to_string()
+}
+
+pub (crate) Variable: ast::Variable = {
+    r"#\d+" => ast::Variable::Number(i64::from_str(&<>[1..]).unwrap()),
+    r"&\w+" => ast::Variable::Pointer(<>[1..].to_string()),
+    r"\*\w+" => ast::Variable::Deref(<>[1..].to_string()),
+}
+
+pub Sentence: ast::Sentence = {
+}
+
+
+
