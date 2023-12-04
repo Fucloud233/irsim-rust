@@ -40,18 +40,18 @@ RelOpt: Operator = {
     "<=" => Operator::LessEqual,
 }
 
-pub (crate) Label: String = {
-    ID => <>.to_string()
+pub (crate) Label: &'input str = {
+    ID => <>
 }
 
-pub (crate) Var: Variable = {
+pub (crate) Var: Variable<'input> = {
     r"#\d+" => Variable::Number(i64::from_str(&<>[1..]).unwrap()),
-    r"&[a-z]\w*" => Variable::Pointer(<>[1..].to_string()),
-    r"\*[a-z]\w*" => Variable::Deref(<>[1..].to_string()),
+    r"&[a-z]\w*" => Variable::Pointer(&<>[1..]),
+    r"\*[a-z]\w*" => Variable::Deref(&<>[1..]),
     Label => Variable::Id(<>),
 }
 
-pub Sentence: Sentence = {
+pub Sentence: Sentence<'input> = {
     // label
     LABEL <Label> COLON         => Sentence::Label(<>),
     FUNC <Label> COLON          => Sentence::Func(<>),

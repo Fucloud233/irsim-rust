@@ -29,10 +29,10 @@ fn test_number() {
         ("#321", Variable::Number(321)),
         ("#89", Variable::Number(89)),
         ("&a", new_pointer("a")),
-        ("&zdcs",new_pointer("zdcs")),
+        ("&abcd",new_pointer("abcd")),
         ("&sa", new_pointer("sa")),
         ("*a", new_deref("a")),
-        ("*zdcs",new_deref("zdcs")),
+        ("*abcd",new_deref("abcd")),
         ("*sa", new_deref("sa")),
     ].iter().enumerate().for_each(|(_i, case)|{
         let parser_result = match parser.parse(case.0) {
@@ -45,9 +45,9 @@ fn test_number() {
 }
 
 fn new_pointer(pointer: &str) -> Variable {
-    Variable::Pointer(String::from(pointer))
+    Variable::Pointer(pointer)
 }
 
 fn new_deref(pointer: &str) -> Variable {
-    Variable::Deref(String::from(pointer))
+    Variable::Deref(pointer)
 }

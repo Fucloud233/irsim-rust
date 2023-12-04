@@ -9,11 +9,11 @@ fn test_parser() {
     let parser = parser::SentenceParser::new();
 
     vec![
-        ("LABEL label1 :", Label(String::from("label1"))),
-        ("FUNCTION mod :", Func(String::from("mod"))),
-        ("vcnt := #0", Assign { l: Id(String::from("vcnt")), r: Number(0) }),
+        ("LABEL label1 :", Label("label1")),
+        ("FUNCTION mod :", Func("mod")),
+        ("vcnt := #0", Assign { l: Id("vcnt"), r: Number(0) }),
         ("*t181 := vi", Assign { 
-            l: Deref(String::from("t181")), 
+            l: Deref("t181"), 
             r: new_id("vi")
         }),
         ("t107 := vt1 * vt2", Arth { 
@@ -22,7 +22,7 @@ fn test_parser() {
             opt: Mul, 
             target: new_id("t107") }),
         ("t165 := &varray + t162", Arth { 
-            l: Pointer(String::from("varray")), 
+            l: Pointer("varray"), 
             r: new_id("t162"), 
             opt: Plus, 
             target: new_id("t165") 
@@ -33,16 +33,16 @@ fn test_parser() {
             opt: Plus, 
             target: new_id("t157") 
         }),
-        ("GOTO label1", Goto(String::from("label1"))),
+        ("GOTO label1", Goto("label1")),
         ("IF vcnt < vk GOTO label2", IfGoto { 
             l: new_id("vcnt"), 
             r: new_id("vk"), 
             opt: Less, 
-            target: String::from("label2") 
+            target: ("label2") 
         }),
         ("RETURN #0", Return(Number(0))),
         ("DEC varray 40", Dec{ var: new_id("varray"), size: 40}),
-        ("t161 := CALL mod", Call { var: new_id("t161"), func: String::from("mod") })
+        ("t161 := CALL mod", Call { var: new_id("t161"), func: ("mod") })
 
     ].iter().for_each(|case|{
         let parser_result = match parser.parse(case.0) {
@@ -56,5 +56,5 @@ fn test_parser() {
 }
 
 fn new_id(id: &str) -> Variable {
-    Id(String::from(id))
+    Id(id)
 }
