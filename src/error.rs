@@ -28,4 +28,5 @@ pub enum InterpreterErrorKind {
     // function
     CurrentFuncNoneError,
     DuplicatedFuncError,
+    UndefinedFuncError,
 }
