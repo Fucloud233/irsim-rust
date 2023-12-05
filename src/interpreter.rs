@@ -1,11 +1,16 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::AddAssign;
+use std::str::FromStr; 
 use lalrpop_util::lalrpop_mod;
 
-use crate::ast::{Sentence, Variable};
-use crate::error::{
-    InterpreterError as IError, 
-    InterpreterErrorKind::*
+use crate::{
+    ast::{Sentence, Variable},
+    computer::Computer,
+    error::{
+        InterpreterError as IError, 
+        InterpreterErrorKind::*
+    },
 };
 
 lalrpop_mod!(pub parser);
@@ -32,16 +37,27 @@ impl Symbol {
 // so the dictionary of function must be recorded
 pub struct Interpreter<'a> {
     codes: Vec<Sentence<'a>>,
+
+    read: Box<dyn Fn() -> String>,
+    write: Box<dyn Fn(&'a str) -> ()>,
+    
     label_table: RefCell<BTreeMap<&'a str, usize>>,
     func_table: RefCell<BTreeMap<&'a str, usize>>,
 
-    symbol_table_stack: RefCell<Vec<Symbol>>,
+    count: RefCell<usize>,
+    symbol_table_stack: RefCell<Vec<Vec<Symbol>>>,
+    computer: Computer,
     ip: RefCell<usize>,
     entrance_ip: RefCell<Option<usize>>
 }
 
 impl <'a>Interpreter<'a> {
-    pub fn from_lines(lines: &Vec<&'a str>) -> Result<Interpreter<'a>, IError> {
+    pub fn from_lines(
+        lines: &Vec<&'a str>,
+        read: Box<dyn Fn() -> String>,
+        write: Box<dyn Fn(&'a str) -> ()>) 
+        -> Result<Interpreter<'a>, IError> 
+    {
         let sent_parser = parser::SentenceParser::new();
         
         let codes = lines.iter()
@@ -52,9 +68,12 @@ impl <'a>Interpreter<'a> {
             codes: codes,
             label_table: RefCell::new(BTreeMap::new()),
             func_table: RefCell::new(BTreeMap::new()),
+            
+            read, write,
 
             symbol_table_stack: RefCell::new(Vec::new()),
-
+            count: RefCell::new(0),
+            computer: Computer::new(),
             ip: RefCell::new(0),
             entrance_ip: RefCell::new(None)
         };
@@ -64,7 +83,7 @@ impl <'a>Interpreter<'a> {
     }   
 
     // it is difficult to decouple checking and loading
-    pub fn check(& self) -> Result<(), IError> {
+    fn check(& self) -> Result<(), IError> {
         let mut cur_func: Option<&str> = None;
         let mut symbol_table: BTreeSet<&str> = BTreeSet::new(); 
 
@@ -98,8 +117,11 @@ impl <'a>Interpreter<'a> {
 
         // main function not found
         match self.entrance_ip.borrow().as_ref() {
-            Some(i) => *self.ip.borrow_mut() = *i,
-            None => IError::new_err(IRSyntaxError, self.codes.len())?
+            None => IError::new_err(IRSyntaxError, self.codes.len())?,
+            Some(i) => {
+                *self.ip.borrow_mut() = *i;
+                self.symbol_table_stack.borrow_mut().push(Vec::new());
+            },
         };
     
         Ok(())
@@ -115,10 +137,17 @@ impl <'a>Interpreter<'a> {
         call_funcs: &mut Vec<(&'a str, usize)> ) -> Result<(), IError>  
     {
 
-        let check_variable_exist = |var: &Variable| {
+        let check_var_exist = |var: &Variable| {
             match var.get_id() {
                 Some(id) => symbol_table.get(id).is_some(),
                 None => false,
+            }
+        };
+
+        let check_var_not_exist = |var: &Variable| {
+            match var.get_id() {
+                Some(id) => symbol_table.get(id).is_none(),
+                None => true,
             }
         };
 
@@ -134,9 +163,9 @@ impl <'a>Interpreter<'a> {
             },
             Sentence::Write(var) 
                 | Sentence::Arg(var) 
-                | Sentence::Return(var) => 
+                | Sentence::Return(var) =>  
             {
-                if !check_variable_exist(var) {
+                if !check_var_not_exist(var) {
                     IError::new_err(UndefinedVariableError, i)?
                 }
             }
@@ -144,7 +173,9 @@ impl <'a>Interpreter<'a> {
                 // the size to allocate must be the number of 4
                 if size % 4 != 0 {
                     IError::new_err(IRSyntaxError, i)?
-                } else if check_variable_exist(var) {
+                }
+
+                if check_var_exist(var) {
                     IError::new_err(DuplicatedVariableError, i)?
                 }
                 symbol_table.insert(var.get_id().unwrap());
@@ -152,14 +183,14 @@ impl <'a>Interpreter<'a> {
             },
             // don't distinguish between declaration and assignment
             Sentence::Assign { l, r } => {
-                if !check_variable_exist(r) {
+                if check_var_not_exist(r) {
                     IError::new_err(UndefinedVariableError, i)?
                 } else if let Some(id) = l.get_id() {
                     symbol_table.insert(id);
                 };
             },
             Sentence::Arth { l, r, target, .. } => {
-                if !(check_variable_exist(l) && check_variable_exist(r)) {
+                if check_var_not_exist(l) || check_var_not_exist(r) {
                     IError::new_err(UndefinedVariableError, i)?
                 } else if let Some(id) = target.get_id() {
                     symbol_table.insert(id);
@@ -172,13 +203,13 @@ impl <'a>Interpreter<'a> {
                 call_funcs.push((*func, i));
             },
             Sentence::IfGoto { target, l, r,  .. } => {
-                if !(check_variable_exist(l) && check_variable_exist(r)) {
+                if check_var_not_exist(l) || check_var_not_exist(r) {
                     IError::new_err(UndefinedVariableError, i)?
                 }
                 goto_labels.push((*target, i))
             },
             Sentence::Goto(target) => goto_labels.push((*target, i)),
-            _ => todo!()
+            _ => ()
         };
 
         Ok(())
@@ -222,8 +253,50 @@ impl <'a>Interpreter<'a> {
         }) 
     }
     
-    fn exec_code() {
+    pub fn exec_code(&self) -> Result<bool, IError> {
+        
+        let ip = *self.ip.borrow();
+        let code = match self.codes.get(ip) {
+            Some(c) => c,
+            None => todo!()
+        };
 
+        match code {
+            Sentence::Read(_) => {
+                let input = match i64::from_str((*self.read)().as_str().trim()) {
+                    Ok(i) => i,
+                    Err(_) => return IError::new_err::<bool>(InputError, ip)
+                };
+                
+                // assign
+
+            }
+            Sentence::Write(_) => {
+                // let output = format!("{}\n", );
+            },
+            Sentence::Goto(_) => todo!(),
+            Sentence::IfGoto { l, r, opt, target } => todo!(),
+            Sentence::Assign { l, r } => todo!(),
+            Sentence::Arth { l, r, opt, target } => todo!(),
+            Sentence::Return(_) => { return Ok(true) },
+            Sentence::Dec { var, size } => todo!(),
+            Sentence::Arg(_) => todo!(),
+            Sentence::Call { var, func } => todo!(),
+            Sentence::Param(_) => todo!(),
+            _ => ()
+        };
+
+        self.count.borrow_mut().add_assign(1);
+        self.ip.borrow_mut().add_assign(1);
+        Ok(false)
+    }
+
+    fn get_value(&self, var: &Variable) -> i64{
+        if let Variable::Number(number) = var {
+            return *number;
+        };
+        
+        todo!();
     }
 }
 
