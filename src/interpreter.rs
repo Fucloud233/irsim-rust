@@ -263,7 +263,7 @@ impl <'a>Interpreter<'a> {
 
         match code {
             Sentence::Read(_) => {
-                let input = match i64::from_str((*self.read)().as_str().trim()) {
+                let input = match u8::from_str((*self.read)().as_str().trim()) {
                     Ok(i) => i,
                     Err(_) => return IError::new_err::<bool>(InputError, ip)
                 };
@@ -291,7 +291,7 @@ impl <'a>Interpreter<'a> {
         Ok(false)
     }
 
-    fn get_value(&self, var: &Variable) -> i64{
+    fn get_value(&self, var: &Variable) -> u8{
         if let Variable::Number(number) = var {
             return *number;
         };

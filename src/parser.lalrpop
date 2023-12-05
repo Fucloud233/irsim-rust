@@ -45,7 +45,7 @@ pub (crate) Label: &'input str = {
 }
 
 pub (crate) Var: Variable<'input> = {
-    r"#\d+" => Variable::Number(i64::from_str(&<>[1..]).unwrap()),
+    r"#\d+" => Variable::Number(u8::from_str(&<>[1..]).unwrap()),
     r"&[a-z]\w*" => Variable::Pointer(&<>[1..]),
     r"\*[a-z]\w*" => Variable::Deref(&<>[1..]),
     Label => Variable::Id(<>),

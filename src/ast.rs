@@ -7,7 +7,7 @@ pub enum Operator {
 
 #[derive(Debug, PartialEq)]
 pub enum Variable<'a> {
-    Number(i64),
+    Number(u8),
     Pointer(&'a str),
     Deref(&'a str),
     Id(&'a str)
