@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, binary_heap};
 use std::ops::AddAssign;
 use std::str::FromStr; 
 use lalrpop_util::lalrpop_mod;
@@ -16,18 +16,18 @@ use crate::{
 lalrpop_mod!(pub parser);
 
 struct Symbol {
-    offset: usize,
-    size: usize,
+    addr: u32,
+    size: u32,
     is_array: bool
 }
 
 impl Symbol {
-    fn new_number(offset: usize) -> Self {
-        Symbol { offset, size:4, is_array: false }
+    fn new_number(addr: u32) -> Self {
+        Symbol { addr, size:4, is_array: false }
     }
 
-    fn new_array(offset: usize, length: usize) -> Self {
-        Symbol { offset, size: 4 * length, is_array: true }
+    fn new_array(addr: u32, length: u32) -> Self {
+        Symbol { addr, size: 4 * length, is_array: true }
     }
 }
 
@@ -44,8 +44,8 @@ pub struct Interpreter<'a> {
     label_table: RefCell<BTreeMap<&'a str, usize>>,
     func_table: RefCell<BTreeMap<&'a str, usize>>,
 
-    count: RefCell<usize>,
-    symbol_table_stack: RefCell<Vec<Vec<Symbol>>>,
+    count: RefCell<u32>,
+    symbol_table_stack: RefCell<Vec<BTreeMap<&'a str, Symbol>>>,
     computer: Computer,
     ip: RefCell<usize>,
     entrance_ip: RefCell<Option<usize>>
@@ -120,7 +120,7 @@ impl <'a>Interpreter<'a> {
             None => IError::new_err(IRSyntaxError, self.codes.len())?,
             Some(i) => {
                 *self.ip.borrow_mut() = *i;
-                self.symbol_table_stack.borrow_mut().push(Vec::new());
+                self.symbol_table_stack.borrow_mut().push(BTreeMap::new());
             },
         };
     
@@ -134,9 +134,8 @@ impl <'a>Interpreter<'a> {
         i: usize,
         symbol_table: &mut BTreeSet<&'a str>,
         goto_labels: &mut Vec<(&'a str, usize)>,
-        call_funcs: &mut Vec<(&'a str, usize)> ) -> Result<(), IError>  
+        call_funcs: &mut Vec<(&'a str, usize)> ) -> Result<(), IError>   
     {
-
         let check_var_exist = |var: &Variable| {
             match var.get_id() {
                 Some(id) => symbol_table.get(id).is_some(),
@@ -263,7 +262,7 @@ impl <'a>Interpreter<'a> {
 
         match code {
             Sentence::Read(_) => {
-                let input = match u8::from_str((*self.read)().as_str().trim()) {
+                let input = match u32::from_str((*self.read)().as_str().trim()) {
                     Ok(i) => i,
                     Err(_) => return IError::new_err::<bool>(InputError, ip)
                 };
@@ -291,15 +290,32 @@ impl <'a>Interpreter<'a> {
         Ok(false)
     }
 
-    fn get_value(&self, var: &Variable) -> u8{
+    fn get_value(&self, var: &Variable) -> u32{
         if let Variable::Number(number) = var {
             return *number;
         };
         
-        todo!();
+        // the address always valid
+        match var {
+            Variable::Pointer(id) => {
+                self.get_addr(id).unwrap()
+            },
+            Variable::Deref(id) => {
+                let addr = self.get_addr(id).unwrap();
+                let new_addr = self.computer.load(addr);
+                self.computer.load(new_addr)
+            },
+            Variable::Id(id) => {
+                let addr = self.get_addr(id).unwrap();
+                self.computer.load(addr)
+            },
+            _ => unreachable!()
+        }
+    }
+
+    fn get_addr(&self, id: &str) -> Option<u32> {
+        let binding = self.symbol_table_stack.borrow();
+        let symbol_table = binding.last().unwrap();
+        symbol_table.get(id).and_then(|s|Some(s.addr))
     }
 }
-
-    fn initialize() {
-
-    }

@@ -7,7 +7,7 @@ pub enum Operator {
 
 #[derive(Debug, PartialEq)]
 pub enum Variable<'a> {
-    Number(u8),
+    Number(u32),
     Pointer(&'a str),
     Deref(&'a str),
     Id(&'a str)
@@ -51,7 +51,7 @@ pub enum Sentence<'a> {
     Return(Variable<'a>),
     Dec{
         var: Variable<'a>,
-        size: usize,
+        size: u32,
     },
     Arg(Variable<'a>),
     Call{
