@@ -9,6 +9,11 @@ mod test {
 }
 
 
+use interpreter::Interpreter;
+
 fn main() {
     println!("Hello, world!");
+
+    let lines = vec![];
+    let interpreter = Interpreter::from_lines(&lines);
 }
