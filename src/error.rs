@@ -9,7 +9,7 @@ impl InterpreterError {
         InterpreterError{kind, i}
     }
 
-    pub fn new_err(kind: InterpreterErrorKind, i: usize) -> Result<(), Self> {
+    pub fn new_err<T>(kind: InterpreterErrorKind, i: usize) -> Result<T, Self> {
         Err(InterpreterError{kind, i})
     }
 }
@@ -29,4 +29,7 @@ pub enum InterpreterErrorKind {
     CurrentFuncNoneError,
     DuplicatedFuncError,
     UndefinedFuncError,
+
+    // input
+    InputError,
 }
