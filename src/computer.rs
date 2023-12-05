@@ -1,8 +1,11 @@
-use lalrpop_util::lalrpop_mod;
+const MAX_SIZE: usize = 2e18 as usize;
 
-lalrpop_mod!(pub parser);
+pub struct Computer {
+    memory: [u8; MAX_SIZE]    
+}
 
-struct Computer {
-    ip: usize,
-    
+impl Computer {
+    pub fn new() -> Self {
+        Computer { memory: [0; MAX_SIZE] }
+    }
 }
