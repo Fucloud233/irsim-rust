@@ -14,7 +14,7 @@ pub enum Variable<'a> {
 }
 
 impl <'a>Variable<'a> {
-    pub fn get_id(&self) -> Option<& str> {
+    pub fn get_id(&self) -> Option<&'a str> {
         if let Variable::Pointer(id)
             | Variable::Deref(id)
             | Variable::Id(id) = self 
