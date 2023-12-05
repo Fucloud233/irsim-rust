@@ -32,8 +32,8 @@ pub enum Sentence<'a> {
     Func(&'a str),
 
     Assign{
-        l: Variable<'a>, 
-        r: Variable<'a>,
+        target: Variable<'a>, 
+        var: Variable<'a>,
     },
     Arth{
         l: Variable<'a>,
@@ -46,16 +46,16 @@ pub enum Sentence<'a> {
         l: Variable<'a>,
         r: Variable<'a>,
         opt: Operator,
-        target: &'a str
+        label: &'a str
     },
     Return(Variable<'a>),
     Dec{
-        var: Variable<'a>,
+        target: Variable<'a>,
         size: u32,
     },
     Arg(Variable<'a>),
     Call{
-        var: Variable<'a>,
+        target: Variable<'a>,
         func: &'a str
     },
     Param(Variable<'a>),

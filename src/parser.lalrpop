@@ -56,21 +56,21 @@ pub Sentence: Sentence<'input> = {
     LABEL <Label> COLON         => Sentence::Label(<>),
     FUNC <Label> COLON          => Sentence::Func(<>),
     // assign
-    <l: Var> ASSIGN <r: Var>    => Sentence::Assign{<>},
+    <target: Var> ASSIGN <var: Var>    => Sentence::Assign{<>},
     <target: Var> ASSIGN <l: Var> <opt: ArthOpt> <r: Var> 
                                 => Sentence::Arth{<>},
-    <var: Var> ASSIGN CALL <func: Label>                
+    <target: Var> ASSIGN CALL <func: Label>                
                                 => Sentence::Call{<>},
     // condition
     GOTO <Label>                => Sentence::Goto(<>),
-    IF <l: Var> <opt: RelOpt> <r: Var> GOTO <target: Label> 
+    IF <l: Var> <opt: RelOpt> <r: Var> GOTO <label: Label> 
                                 => Sentence::IfGoto{<>},
     // function
     RETURN <Var>                => Sentence::Return(<>),
     ARG <Var>                   => Sentence::Arg(<>),
     PARAM <Var>                 => Sentence::Param(<>),
     // array
-    DEC <var: Var> <size: Number> 
+    DEC <target: Var> <size: Number> 
                                 => Sentence::Dec{<>},
     // io
     READ <Var>                  => Sentence::Read(<>),

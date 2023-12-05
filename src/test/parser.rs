@@ -11,10 +11,10 @@ fn test_parser() {
     vec![
         ("LABEL label1 :", Label("label1")),
         ("FUNCTION mod :", Func("mod")),
-        ("vcnt := #0", Assign { l: Id("vcnt"), r: Number(0) }),
+        ("vcnt := #0", Assign { target: Id("vcnt"), var: Number(0) }),
         ("*t181 := vi", Assign { 
-            l: Deref("t181"), 
-            r: new_id("vi")
+            target: Deref("t181"), 
+            var: new_id("vi")
         }),
         ("t107 := vt1 * vt2", Arth { 
             l: new_id("vt1"), 
@@ -38,11 +38,11 @@ fn test_parser() {
             l: new_id("vcnt"), 
             r: new_id("vk"), 
             opt: Less, 
-            target: ("label2") 
+            label: ("label2") 
         }),
         ("RETURN #0", Return(Number(0))),
-        ("DEC varray 40", Dec{ var: new_id("varray"), size: 40}),
-        ("t161 := CALL mod", Call { var: new_id("t161"), func: ("mod") })
+        ("DEC varray 40", Dec{ target: new_id("varray"), size: 40}),
+        ("t161 := CALL mod", Call { target: new_id("t161"), func: ("mod") })
 
     ].iter().for_each(|case|{
         let parser_result = match parser.parse(case.0) {

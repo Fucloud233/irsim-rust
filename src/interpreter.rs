@@ -168,23 +168,23 @@ impl <'a>Interpreter<'a> {
                     IError::new_err(UndefinedVariableError, i)?
                 }
             }
-            Sentence::Dec { var, size } => {
+            Sentence::Dec { target, size } => {
                 // the size to allocate must be the number of 4
                 if size % 4 != 0 {
                     IError::new_err(IRSyntaxError, i)?
                 }
 
-                if check_var_exist(var) {
+                if check_var_exist(target) {
                     IError::new_err(DuplicatedVariableError, i)?
                 }
-                symbol_table.insert(var.get_id().unwrap());
+                symbol_table.insert(target.get_id().unwrap());
 
             },
             // don't distinguish between declaration and assignment
-            Sentence::Assign { l, r } => {
-                if check_var_not_exist(r) {
+            Sentence::Assign { target, var } => {
+                if check_var_not_exist(var) {
                     IError::new_err(UndefinedVariableError, i)?
-                } else if let Some(id) = l.get_id() {
+                } else if let Some(id) = target.get_id() {
                     symbol_table.insert(id);
                 };
             },
@@ -195,19 +195,19 @@ impl <'a>Interpreter<'a> {
                     symbol_table.insert(id);
                 };
             },
-            Sentence::Call { var, func } => {
-                if let Some(id) = var.get_id() {
+            Sentence::Call { target, func } => {
+                if let Some(id) = target.get_id() {
                     symbol_table.insert(id);
                 };
                 call_funcs.push((*func, i));
             },
-            Sentence::IfGoto { target, l, r,  .. } => {
+            Sentence::IfGoto { label, l, r,  .. } => {
                 if check_var_not_exist(l) || check_var_not_exist(r) {
                     IError::new_err(UndefinedVariableError, i)?
                 }
-                goto_labels.push((*target, i))
+                goto_labels.push((*label, i))
             },
-            Sentence::Goto(target) => goto_labels.push((*target, i)),
+            Sentence::Goto(label) => goto_labels.push((*label, i)),
             _ => ()
         };
 
@@ -257,7 +257,7 @@ impl <'a>Interpreter<'a> {
         let ip = *self.ip.borrow();
         let code = match self.codes.get(ip) {
             Some(c) => c,
-            None => todo!()
+            None => {println!("{}", ip); todo!()}
         };
 
         match code {
@@ -274,14 +274,6 @@ impl <'a>Interpreter<'a> {
                 // let output = format!("{}\n", );
             },
             Sentence::Goto(_) => todo!(),
-            Sentence::IfGoto { l, r, opt, target } => todo!(),
-            Sentence::Assign { l, r } => todo!(),
-            Sentence::Arth { l, r, opt, target } => todo!(),
-            Sentence::Return(_) => { return Ok(true) },
-            Sentence::Dec { var, size } => todo!(),
-            Sentence::Arg(_) => todo!(),
-            Sentence::Call { var, func } => todo!(),
-            Sentence::Param(_) => todo!(),
             _ => ()
         };
 
@@ -311,6 +303,10 @@ impl <'a>Interpreter<'a> {
             },
             _ => unreachable!()
         }
+    }
+    
+    fn set_value(&self, target: &Variable, var: &Variable) {
+        
     }
 
     fn get_addr(&self, id: &str) -> Option<u32> {
