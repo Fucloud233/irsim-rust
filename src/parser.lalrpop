@@ -25,7 +25,7 @@ Number: u32 = {
     r"\d+" => u32::from_str(&<>).unwrap()
 }
 
-ArthOpt: Operator = {
+ArithOpt: Operator = {
     "+" => Operator::Plus,
     "-" => Operator::Sub,
     "*" => Operator::Mul,
@@ -57,8 +57,8 @@ pub Sentence: Sentence<'input> = {
     FUNC <Label> COLON          => Sentence::Func(<>),
     // assign
     <target: Var> ASSIGN <var: Var>    => Sentence::Assign{<>},
-    <target: Var> ASSIGN <l: Var> <opt: ArthOpt> <r: Var> 
-                                => Sentence::Arth{<>},
+    <target: Var> ASSIGN <l: Var> <opt: ArithOpt> <r: Var> 
+                                => Sentence::Arith{<>},
     <target: Var> ASSIGN CALL <func: Label>                
                                 => Sentence::Call{<>},
     // condition

@@ -16,18 +16,18 @@ fn test_parser() {
             target: Deref("t181"), 
             var: new_id("vi")
         }),
-        ("t107 := vt1 * vt2", Arth { 
+        ("t107 := vt1 * vt2", Arith { 
             l: new_id("vt1"), 
             r: new_id("vt2"), 
             opt: Mul, 
             target: new_id("t107") }),
-        ("t165 := &varray + t162", Arth { 
+        ("t165 := &varray + t162", Arith { 
             l: Pointer("varray"), 
             r: new_id("t162"), 
             opt: Plus, 
             target: new_id("t165") 
         }),
-        ("t157 := vsum + #1", Arth { 
+        ("t157 := vsum + #1", Arith { 
             l: new_id("vsum"), 
             r: Number(1), 
             opt: Plus, 

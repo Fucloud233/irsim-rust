@@ -5,6 +5,28 @@ pub enum Operator {
     Equal, Greater, Less, GreaterEqual, LessEqual
 }
 
+impl Operator {
+    pub fn calculate(&self, l: u32, r: u32) -> u32 {
+        match self {
+            Operator::Plus => l + r,
+            Operator::Sub => l - r,
+            Operator::Mul => l * r,
+            Operator::Div => l / r,
+            _ => {
+                let flag = match self {
+                    Operator::Equal => l == r,
+                    Operator::Greater => l > r,
+                    Operator::Less => l < r,
+                    Operator::GreaterEqual => l >= r,
+                    Operator::LessEqual => l <= r,
+                    _ => unreachable!()
+                };
+                if flag {1} else {0}
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Variable<'a> {
     Number(u32),
@@ -35,7 +57,7 @@ pub enum Sentence<'a> {
         target: Variable<'a>, 
         var: Variable<'a>,
     },
-    Arth{
+    Arith{
         l: Variable<'a>,
         r: Variable<'a>,
         opt: Operator,
