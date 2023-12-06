@@ -26,6 +26,15 @@ impl Computer {
         pointer.add_assign(size);
         addr
     }
+
+    pub fn push(&mut self) {
+        let cur_pointer = self.pointer_stack.last().unwrap();
+        self.pointer_stack.push(*cur_pointer);
+    }
+
+    pub fn pop(&mut self) {
+        self.pointer_stack.pop().unwrap();
+    }
 }
 
 #[inline]
