@@ -23,7 +23,7 @@ struct Symbol {
 
 impl Symbol {
     fn new_number(addr: u32) -> Self {
-        Symbol { addr, size:4, is_array: false }
+        Symbol { addr, size: 4, is_array: false }
     }
 
     fn new_array(addr: u32, length: u32) -> Self {
@@ -38,7 +38,7 @@ struct Call<'a> {
 
 impl<'a> Call<'a> {
     fn new(ip: usize, var: Variable<'a>) -> Self  {
-        Call {ip, var}
+        Call { ip, var }
     }
 }
 
@@ -52,15 +52,20 @@ pub struct Interpreter<'a> {
     read: Box<dyn Fn() -> String>,
     write: Box<dyn Fn(String) -> ()>,
     
+    // resident status
+    entrance_ip: RefCell<Option<usize>>,
     label_table: RefCell<BTreeMap<&'a str, usize>>,
     func_table: RefCell<BTreeMap<&'a str, usize>>,
 
+    // temporary
+    ip: RefCell<usize>,
     count: RefCell<u32>,
     symbol_table_stack: RefCell<Vec<BTreeMap<&'a str, Symbol>>>,
     call_stack: RefCell<Vec<Call<'a>>>,
+    argument_stack: RefCell<Vec<u32>>,
+
+    // computer model
     computer: RefCell<Computer>,
-    ip: RefCell<usize>,
-    entrance_ip: RefCell<Option<usize>>
 }
 
 impl <'a>Interpreter<'a> {
@@ -85,6 +90,8 @@ impl <'a>Interpreter<'a> {
 
             symbol_table_stack: RefCell::new(Vec::new()),
             call_stack: RefCell::new(Vec::new()),
+            argument_stack: RefCell::new(Vec::new()),
+
             count: RefCell::new(0),
             computer: RefCell::new(Computer::new()),
             ip: RefCell::new(0),
@@ -98,19 +105,24 @@ impl <'a>Interpreter<'a> {
     // it is difficult to decouple checking and loading
     fn check(& self) -> Result<(), IError> {
         let mut cur_func: Option<&str> = None;
+        // the symbol_table is different with the one in interpreter
+        // it's used to check variable duplicated and undefined
         let mut symbol_table: BTreeSet<&str> = BTreeSet::new(); 
 
         let (mut goto_labels, mut call_funcs) = (Vec::new(), Vec::new());
         
         // check label and variable
         for (i, code) in self.codes.iter().enumerate() {
-            // TODO: when check label, it need to continue
             // 1. check label
-            if self.check_label(code, i, &mut cur_func)? {
-                // if current function change, symbol variable should be cleared 
-                symbol_table.clear()
-            } else if cur_func.is_none() {
-                IError::new_err(CurrentFuncNoneError, i)?
+            if let Some(flag) = self.check_label(code, i, &mut cur_func)? {
+                if flag {
+                    // if current function change, symbol variable should be cleared 
+                    symbol_table.clear()
+                } else if cur_func.is_none() {
+                    IError::new_err(CurrentFuncNoneError, i)?
+                }
+                // this'is a label, we don't need to continue
+                continue
             }
 
             // 2. check variable
@@ -137,7 +149,7 @@ impl <'a>Interpreter<'a> {
                 self.symbol_table_stack.borrow_mut().push(BTreeMap::new());
             },
         };
-    
+
         Ok(())
     }
 
@@ -204,11 +216,12 @@ impl <'a>Interpreter<'a> {
                     _ => IError::new_err(IRSyntaxError, i)?
                 };
             },
+            // TODO: check ARG equal PARAM
             Sentence::Write(var) 
                 | Sentence::Arg(var) 
                 | Sentence::Return(var) =>  
             {
-                if !check_var_not_exist(var, &symbol_table) {
+                if check_var_not_exist(var, &symbol_table) {
                     IError::new_err(UndefinedVariableError, i)?
                 }
             }
@@ -248,7 +261,7 @@ impl <'a>Interpreter<'a> {
         &self, 
         code: &Sentence<'a>, 
         i: usize, 
-        cur_func: &mut Option<&'a str>) -> Result<bool, IError>  
+        cur_func: &mut Option<&'a str>) -> Result<Option<bool>, IError>  
     {
         Ok(if let Sentence::Label(label) = code {
             let mut label_table = self.label_table.borrow_mut();
@@ -260,7 +273,7 @@ impl <'a>Interpreter<'a> {
             }
             label_table.insert(label, i);
 
-            false
+            Some(false)
         } else if let Sentence::Func(label) = code {
             let mut func_table = self.func_table.borrow_mut();
             
@@ -274,14 +287,13 @@ impl <'a>Interpreter<'a> {
             // modify the current function
             cur_func.get_or_insert(label);
 
-            true
+            Some(true)
         }else {
-            false
+            None
         }) 
     }
     
     pub fn execute(&self) -> Result<bool, IError> {
-        
         let ip = *self.ip.borrow();
         let code = match self.codes.get(ip) {
             Some(c) => c,
@@ -308,26 +320,61 @@ impl <'a>Interpreter<'a> {
                     self.goto(label);
                 }   
             },
+            Sentence::Dec { target, size } => {
+                if let Variable::Id(id) = target {
+                    let addr = self.computer.borrow_mut().allocate(*size);
+                    // get the symbol
+                    // important: dec is different with assign
+                    // it must to register the id in the symbol label
+                    let mut binding = self.symbol_table_stack.borrow_mut();
+                    let symbol_table = binding.last_mut().unwrap();
+                    symbol_table.insert(id, Symbol::new_array(addr, *size));
+    
+                    self.assign_number(target, addr)
+                }
+            }
             Sentence::Assign { target, var } => self.assign(target, var),
             Sentence::Arith { l, r, opt, target } => {
                 let result = opt.calculate(self.get_var(l), self.get_var(r));
                 self.assign_number(target, result)
             },
             Sentence::Return(var) => {
-                let mut symbol_table_stack = self.symbol_table_stack.borrow_mut();
-                if symbol_table_stack.len() == 0 {
+                // 1. if the stack is empty, the program over
+                if self.symbol_table_stack.borrow().len() == 1 {
                     return Ok(true)
-                }
-                // TODO: how to recycle the memory
-                let return_value = self.get_var(var);
-                symbol_table_stack.pop();
-                
+                }    
 
-                // symbol_table_stack.last().unwrap()
+                // 2. get the return value
+                let return_value = self.get_var(var);
+
+                // 3. get the call info (old_ip, variable) 
+                // and pop stack (call_stack, symbol_stack, memory stack)
+                let call = self.call_stack.borrow_mut().pop().unwrap();
+                self.symbol_table_stack.borrow_mut().pop();
+                self.computer.borrow_mut().pop();
+                
+                // 4. modify the ip and assign return value
+                *self.ip.borrow_mut() = call.ip;
+                self.assign_number(&call.var, return_value);        
             }
             Sentence::Call { target, func } => {
-                // let call = Call::new(self.ip.borrow(), self)
+                // 1. record call info
+                let call = Call::new(*self.ip.borrow(), target.clone());
+
+                // 2. record current status
+                self.call_stack.borrow_mut().push(call);
+                self.symbol_table_stack.borrow_mut().push(BTreeMap::new());
+                self.computer.borrow_mut().push();
                 
+                // 3. goto this function
+                self.goto(func);
+            }
+            Sentence::Arg (var) => {
+                self.argument_stack.borrow_mut().push(self.get_var(var));
+            },
+            Sentence::Param(var) => {
+                let value = self.argument_stack.borrow_mut().pop().unwrap();
+                self.assign_number(var, value);
             }
             _ => ()
         };
@@ -352,32 +399,45 @@ impl <'a>Interpreter<'a> {
         // the address always valid
         match var {
             Variable::Pointer(id) => {
-                self.get_addr(id)
+                self.get_addr(id).unwrap()
             },
             Variable::Deref(id) => {
-                let addr = self.get_addr(id);
+                let addr = self.get_addr(id).unwrap();
                 let new_addr = computer.load(addr);
                 computer.load(new_addr)
             },
             Variable::Id(id) => {
-                let addr = self.get_addr(id);
+                let addr = self.get_addr(id).unwrap();
                 computer.load(addr)
             },
             _ => unreachable!()
         }
     }
     
-    fn assign(&self, target: &Variable, var: &Variable) {
+    fn assign(&self, target: &Variable<'a>, var: &Variable) {
         self.assign_number(target, self.get_var(var))
     }
 
-    fn assign_number(&self, target: &Variable, number: u32) {
+    fn assign_number(&self, target: &Variable<'a>, number: u32) {
         let mut computer = self.computer.borrow_mut();
 
         let addr = match target {
-            Variable::Id(id) => self.get_addr(id),
+            Variable::Id(id) => {
+                match self.get_addr(id) {
+                    Some(addr) => addr,
+                    // when id isn't in the symbol table
+                    // we should allocate memory for it
+                    None => {
+                        let addr = computer.allocate(1);
+                        let mut binding = self.symbol_table_stack.borrow_mut();
+                        let symbol_table = binding.last_mut().unwrap();
+                        symbol_table.insert(*id, Symbol::new_number(addr));
+                        addr
+                    }
+                }
+            }
             Variable::Deref(id) => {
-                let addr = self.get_addr(id);
+                let addr = self.get_addr(id).unwrap();
                 computer.load(addr)
             }
             _ => unreachable!()
@@ -387,17 +447,9 @@ impl <'a>Interpreter<'a> {
     }
 
     // it must be left value here  
-    fn get_addr(&self, id: &str) -> u32 {
+    fn get_addr(&self, id: &str) -> Option<u32> {
         let binding = self.symbol_table_stack.borrow();
         let symbol_table = binding.last().unwrap();
-        match symbol_table.get(id) {
-            Some(symbol) => symbol.addr,
-            // when id isn't in the symbol table
-            // we should allocate memory for it
-            None => {
-                let mut computer = self.computer.borrow_mut();
-                computer.allocate(1)
-            }
-        }
+        symbol_table.get(id).and_then(|symbol| Some(symbol.addr))
     }
 }
