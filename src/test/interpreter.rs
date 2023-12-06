@@ -18,7 +18,7 @@ fn test_io() {
 
     let interpreter = Interpreter::from_lines(&lines, read_func, write_func).unwrap();
     loop {
-        let result = interpreter.exec_code().unwrap();
+        let result = interpreter.execute().unwrap();
         if result {
             break
         }
