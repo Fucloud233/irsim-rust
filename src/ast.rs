@@ -27,7 +27,7 @@ impl Operator {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Variable<'a> {
     Number(u32),
     Pointer(&'a str),
