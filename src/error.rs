@@ -32,4 +32,5 @@ pub enum InterpreterErrorKind {
 
     // input
     InputError,
+    LeftValueError,
 }
