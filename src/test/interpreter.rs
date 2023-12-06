@@ -14,7 +14,7 @@ fn test_io() {
         input
     });
 
-    let write_func = Box::new(|text: &str|{});
+    let write_func = Box::new(|text: String|{});
 
     let interpreter = Interpreter::from_lines(&lines, read_func, write_func).unwrap();
     loop {
