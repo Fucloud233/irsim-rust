@@ -21,8 +21,8 @@ ASSIGN = ":=";
 
 ID =  r"[a-z]\w*";
 
-Number: u32 = {
-    r"\d+" => u32::from_str(&<>).unwrap()
+Number: i32 = {
+    r"\d+" => i32::from_str(&<>).unwrap()
 }
 
 ArithOpt: Operator = {
@@ -45,7 +45,7 @@ pub (crate) Label: &'input str = {
 }
 
 pub (crate) Var: Variable<'input> = {
-    r"#\d+" => Variable::Number(u32::from_str(&<>[1..]).unwrap()),
+    r"#-?\d+" => Variable::Number(i32::from_str(&<>[1..]).unwrap()),
     r"&[a-z]\w*" => Variable::Pointer(&<>[1..]),
     r"\*[a-z]\w*" => Variable::Deref(&<>[1..]),
     Label => Variable::Id(<>),

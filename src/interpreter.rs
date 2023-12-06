@@ -16,17 +16,17 @@ use crate::{
 lalrpop_mod!(pub parser);
 
 struct Symbol {
-    addr: u32,
-    size: u32,
+    addr: i32,
+    size: i32,
     is_array: bool
 }
 
 impl Symbol {
-    fn new_number(addr: u32) -> Self {
+    fn new_number(addr: i32) -> Self {
         Symbol { addr, size: 4, is_array: false }
     }
 
-    fn new_array(addr: u32, length: u32) -> Self {
+    fn new_array(addr: i32, length: i32) -> Self {
         Symbol { addr, size: 4 * length, is_array: true }
     }
 }
@@ -59,10 +59,10 @@ pub struct Interpreter<'a> {
 
     // temporary
     ip: RefCell<usize>,
-    count: RefCell<u32>,
+    count: RefCell<usize>,
     symbol_table_stack: RefCell<Vec<BTreeMap<&'a str, Symbol>>>,
     call_stack: RefCell<Vec<Call<'a>>>,
-    argument_stack: RefCell<Vec<u32>>,
+    argument_stack: RefCell<Vec<i32>>,
 
     // computer model
     computer: RefCell<Computer>,
@@ -73,13 +73,19 @@ impl <'a>Interpreter<'a> {
         lines: &Vec<&'a str>,
         read: Box<dyn Fn() -> String>,
         write: Box<dyn Fn(String) -> ()>) 
-        -> Result<Interpreter<'a>, IError> 
+        -> Result<Interpreter<'a>, IError<'a>> 
     {
         let sent_parser = parser::SentenceParser::new();
-        
-        let codes = lines.iter()
-            .map(|line|sent_parser.parse(line).unwrap())
-            .collect::<Vec<Sentence>>();
+
+        let mut codes = Vec::with_capacity(lines.len());
+        for (i, line) in lines.iter().enumerate() {
+            let code = match sent_parser.parse(line) {
+                Ok(code) => code,
+                Err(err) => IError::new_err::<Sentence>(ParseError(err), i)?
+            };
+
+            codes.push(code);
+        }
         
         let interpreter = Self { 
             codes: codes,
@@ -103,7 +109,7 @@ impl <'a>Interpreter<'a> {
     }   
 
     // it is difficult to decouple checking and loading
-    fn check(& self) -> Result<(), IError> {
+    fn check(& self) -> Result<(), IError<'a>> {
         let mut cur_func: Option<&str> = None;
         // the symbol_table is different with the one in interpreter
         // it's used to check variable duplicated and undefined
@@ -160,7 +166,7 @@ impl <'a>Interpreter<'a> {
         i: usize,
         symbol_table: &mut BTreeSet<&'a str>,
         goto_labels: &mut Vec<(&'a str, usize)>,
-        call_funcs: &mut Vec<(&'a str, usize)> ) -> Result<(), IError>   
+        call_funcs: &mut Vec<(&'a str, usize)> ) -> Result<(), IError<'a>>   
     {
         let check_var_not_exist = |var: &Variable, symbol_table: &BTreeSet<&str>|{
             match var.get_id() {
@@ -178,10 +184,9 @@ impl <'a>Interpreter<'a> {
                 Variable::Number(_) | Variable::Pointer(_)
                     => IError::new_err(LeftValueError, i)?,
                 Variable::Id(id) => {
-                    if symbol_table.get(id).is_some() {
-                        IError::new_err(DuplicatedVariableError, i)?
+                    if symbol_table.get(id).is_none() {
+                        symbol_table.insert(id);
                     }
-                    symbol_table.insert(id);
                 },
                 Variable::Deref(id) 
                     => if symbol_table.get(id).is_none() {
@@ -235,7 +240,7 @@ impl <'a>Interpreter<'a> {
                     Variable::Number(_) | Variable::Pointer(_) | Variable::Deref(_)
                         => IError::new_err(LeftValueError, i)?,
                     Variable::Id(id) => if symbol_table.get(id).is_some() {
-                        IError::new_err(DuplicatedFuncError, i)?
+                        IError::new_err(DuplicatedVariableError, i)?
                     }
                 };
 
@@ -261,7 +266,7 @@ impl <'a>Interpreter<'a> {
         &self, 
         code: &Sentence<'a>, 
         i: usize, 
-        cur_func: &mut Option<&'a str>) -> Result<Option<bool>, IError>  
+        cur_func: &mut Option<&'a str>) -> Result<Option<bool>, IError<'a>>  
     {
         Ok(if let Sentence::Label(label) = code {
             let mut label_table = self.label_table.borrow_mut();
@@ -293,18 +298,22 @@ impl <'a>Interpreter<'a> {
         }) 
     }
     
-    pub fn execute(&self) -> Result<bool, IError> {
+    // when program is over, it will return the running count
+    pub fn execute(&self) -> Result<Option<usize>, IError> {
         let ip = *self.ip.borrow();
         let code = match self.codes.get(ip) {
             Some(c) => c,
             None => {println!("{}", ip); todo!()}
         };
 
+        // increment count
+        self.count.borrow_mut().add_assign(1);
+
         match code {
             Sentence::Read(var) => {
-                let input = match u32::from_str((*self.read)().as_str().trim()) {
+                let input = match i32::from_str((*self.read)().as_str().trim()) {
                     Ok(i) => i,
-                    Err(_) => return IError::new_err::<bool>(InputError, ip)
+                    Err(_) => return IError::new_err::<Option<usize>>(InputError, ip)
                 };
                 self.assign_number(var, input);
                 
@@ -323,12 +332,15 @@ impl <'a>Interpreter<'a> {
             Sentence::Dec { target, size } => {
                 if let Variable::Id(id) = target {
                     let addr = self.computer.borrow_mut().allocate(*size);
-                    // get the symbol
-                    // important: dec is different with assign
-                    // it must to register the id in the symbol label
-                    let mut binding = self.symbol_table_stack.borrow_mut();
-                    let symbol_table = binding.last_mut().unwrap();
-                    symbol_table.insert(id, Symbol::new_array(addr, *size));
+                    // it's necessary to use {} to let the borrow over
+                    {
+                        // get the symbol
+                        // important: dec is different with assign
+                        // it must to register the id in the symbol label
+                        let mut binding = self.symbol_table_stack.borrow_mut();
+                        let symbol_table = binding.last_mut().unwrap();
+                        symbol_table.insert(id, Symbol::new_array(addr, *size));
+                    }
     
                     self.assign_number(target, addr)
                 }
@@ -341,7 +353,7 @@ impl <'a>Interpreter<'a> {
             Sentence::Return(var) => {
                 // 1. if the stack is empty, the program over
                 if self.symbol_table_stack.borrow().len() == 1 {
-                    return Ok(true)
+                    return Ok(Some(*self.count.borrow()))
                 }    
 
                 // 2. get the return value
@@ -367,7 +379,7 @@ impl <'a>Interpreter<'a> {
                 self.computer.borrow_mut().push();
                 
                 // 3. goto this function
-                self.goto(func);
+                self.call(func);
             }
             Sentence::Arg (var) => {
                 self.argument_stack.borrow_mut().push(self.get_var(var));
@@ -379,9 +391,8 @@ impl <'a>Interpreter<'a> {
             _ => ()
         };
 
-        self.count.borrow_mut().add_assign(1);
         self.ip.borrow_mut().add_assign(1);
-        Ok(false)
+        Ok(None)
     }
 
     fn goto(&self, label: &str) {
@@ -390,11 +401,17 @@ impl <'a>Interpreter<'a> {
         *self.ip.borrow_mut() = *new_ip;
     }
 
-    fn get_var(&self, var: &Variable) -> u32{
+    fn call(&self, func: &str) {
+        let binding = self.func_table.borrow();
+        let new_ip = binding.get(func).unwrap();
+        *self.ip.borrow_mut() = *new_ip;
+    }
+
+    fn get_var(&self, var: &Variable) -> i32{
         if let Variable::Number(number) = var {
             return *number;
         };
-        
+
         let computer = self.computer.borrow();
         // the address always valid
         match var {
@@ -418,7 +435,7 @@ impl <'a>Interpreter<'a> {
         self.assign_number(target, self.get_var(var))
     }
 
-    fn assign_number(&self, target: &Variable<'a>, number: u32) {
+    fn assign_number(&self, target: &Variable<'a>, number: i32) {
         let mut computer = self.computer.borrow_mut();
 
         let addr = match target {
@@ -447,7 +464,7 @@ impl <'a>Interpreter<'a> {
     }
 
     // it must be left value here  
-    fn get_addr(&self, id: &str) -> Option<u32> {
+    fn get_addr(&self, id: &str) -> Option<i32> {
         let binding = self.symbol_table_stack.borrow();
         let symbol_table = binding.last().unwrap();
         symbol_table.get(id).and_then(|symbol| Some(symbol.addr))

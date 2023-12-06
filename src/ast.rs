@@ -6,7 +6,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn calculate(&self, l: u32, r: u32) -> u32 {
+    pub fn calculate(&self, l: i32, r: i32) -> i32 {
         match self {
             Operator::Plus => l + r,
             Operator::Sub => l - r,
@@ -29,7 +29,7 @@ impl Operator {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Variable<'a> {
-    Number(u32),
+    Number(i32),
     Pointer(&'a str),
     Deref(&'a str),
     Id(&'a str)
@@ -73,7 +73,7 @@ pub enum Sentence<'a> {
     Return(Variable<'a>),
     Dec{
         target: Variable<'a>,
-        size: u32,
+        size: i32,
     },
     Arg(Variable<'a>),
     Call{
