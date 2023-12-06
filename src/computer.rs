@@ -1,23 +1,32 @@
+use std::ops::AddAssign;
+
 const MAX_SIZE: usize = 2^18;
 
 pub struct Computer {
-    memory: [u32; MAX_SIZE as usize]    
+    memory: [u32; MAX_SIZE as usize],  
+    pointer_stack: Vec<u32>,  
 }
 
 impl Computer {
     pub fn new() -> Self {
-        Computer { memory: [0; MAX_SIZE] }
+        Computer { memory: [0; MAX_SIZE], pointer_stack: vec![0] }
     }
 
     pub fn load(&self, address: u32) -> u32 {
         self.memory[get_addr(address)]
     }
 
-    pub fn save(&mut self, address: u32, value: u32,) {
+    pub fn save(&mut self, address: u32, value: u32) {
         self.memory[get_addr(address)] = value;
     }
-}
 
+    pub fn allocate(&mut self, size: u32) -> u32 {
+        let pointer = self.pointer_stack.last_mut().unwrap();
+        let addr = *pointer * 4;
+        pointer.add_assign(size);
+        addr
+    }
+}
 
 #[inline]
 fn get_addr(offset: u32) -> usize{
