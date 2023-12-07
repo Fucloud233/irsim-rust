@@ -9,7 +9,9 @@ use crate::{
     computer::Computer,
     error::{
         InterpreterError as IError, 
-        InterpreterErrorKind::*
+        InterpreterErrorKind::*,
+        RuntimeError as RError,
+        RuntimeErrorKind::*
     },
 };
 
@@ -299,7 +301,7 @@ impl <'a>Interpreter<'a> {
     }
     
     // when program is over, it will return the running count
-    pub fn execute(&self) -> Result<Option<usize>, IError> {
+    pub fn execute(&self) -> Result<Option<usize>, RError> {
         let ip = *self.ip.borrow();
         let code = match self.codes.get(ip) {
             Some(c) => c,
@@ -313,7 +315,7 @@ impl <'a>Interpreter<'a> {
             Sentence::Read(var) => {
                 let input = match i32::from_str((*self.read)().as_str().trim()) {
                     Ok(i) => i,
-                    Err(_) => return IError::new_err::<Option<usize>>(InputError, ip)
+                    Err(_) => return RError::new_err::<Option<usize>>(InputError, ip)
                 };
                 self.assign_number(var, input);
                 
@@ -468,5 +470,16 @@ impl <'a>Interpreter<'a> {
         let binding = self.symbol_table_stack.borrow();
         let symbol_table = binding.last().unwrap();
         symbol_table.get(id).and_then(|symbol| Some(symbol.addr))
+    }
+
+    pub fn clear(&self) {
+        *self.ip.borrow_mut() = self.entrance_ip.borrow().unwrap();  
+        *self.count.borrow_mut() = 0;
+
+        self.symbol_table_stack.borrow_mut().clear();
+        self.symbol_table_stack.borrow_mut().push(BTreeMap::new());
+        self.call_stack.borrow_mut().clear();
+        self.argument_stack.borrow_mut().clear();
+        self.computer.borrow_mut().clear();
     }
 }

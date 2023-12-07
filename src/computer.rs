@@ -35,6 +35,11 @@ impl Computer {
     pub fn pop(&mut self) {
         self.pointer_stack.pop().unwrap();
     }
+
+    pub fn clear(&mut self) {
+        self.pointer_stack.clear();
+        self.pointer_stack.push(0);
+    }
 }
 
 #[inline]
